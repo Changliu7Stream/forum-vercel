@@ -18,9 +18,9 @@ let pool = null;
 function getPool() {
   if (!pool) {
     // 优先用环境变量（推荐，更安全）；无环境变量时用 fallback 连接
-    // 直连 Postgres（绕过 Supavisor pooler，避免自定义用户认证问题）
+    // Session pooler（端口 5432）支持自定义用户，Transaction pooler（6543）仅支持 postgres 用户
     const connectionString = process.env.DATABASE_URL ||
-      'postgresql://forum_app:Forum2026Secure%21@db.ofydzectpjylurtbcmis.supabase.co:5432/postgres';
+      'postgresql://forum_app.ofydzectpjylurtbcmis:Forum2026Secure%21@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres';
     pool = new Pool({
       connectionString,
       max: process.env.PG_MAX_CONN ? parseInt(process.env.PG_MAX_CONN) : 3,
