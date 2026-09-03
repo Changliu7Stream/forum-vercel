@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>通知 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar"><div class="navbar-inner"></div></header>
+
+  <main class="container container-sm">
+    <div class="page-header">
+      <a href="/" class="btn btn-ghost btn-sm mb-2"><i class="icon-arrow-left"></i> 返回</a>
+      <div class="flex items-center justify-between">
+        <h1 class="page-title"><i class="icon-bell"></i> 通知</h1>
+        <button class="btn btn-secondary btn-sm" id="mark-all-read">全部标为已读</button>
+      </div>
+    </div>
+
+    <div class="card" id="notification-list">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+    <div id="pagination"></div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    let currentPage = 1;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!isLoggedIn()) {
+        window.location.href = '/login.html?redirect=/notifications.html';
+        return;
+      }
+
+      initNavbar();
+
+      document.getElementById('mark-all-read').addEventListener('click', async () => {
+        await api.put('/notifications/read-all');
+        Toast.success('已全部标记为已读');
+        document.querySelectorAll('.notification-item.unread').forEach(el => {
+          el.classList.remove('unread');
+        });
+        loadNotifications();
+      });
+
+      await loadNotifications();
+    });
+
+    async function loadNotifications(page = 1) {
+      currentPage = page;
+      const res = await api.get(`/notifications?page=${page}`);
+      if (!res || res.code !== 200) return;
+
+      const container = document.getElementById('notification-list');
+      const { items, total_pages } = res.data;
+
+      if (items.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="icon-bell"></i><h3>暂无通知</h3><p>这里会显示你的所有通知</p></div>';
+        return;
+      }
+
+      const typeIcons = {
+        reply: 'icon-message-circle',
+        like: 'icon-heart',
+        system: 'icon-info',
+        mention: 'icon-at-sign'
+      };
+
+      container.innerHTML = items.map(n => `
+        <div class="notification-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}">
+          <div class="notification-icon">
+            <i class="${typeIcons[n.type] || 'icon-bell'}"></i>
+          </div>
+          <div class="notification-content">
+            <div class="notification-title">${escapeHtml(n.title || '新通知')}</div>
+            ${n.content ? `<div class="notification-desc">${escapeHtml(n.content)}</div>` : ''}
+            <div class="notification-time">${timeAgo(n.created_at)}</div>
+          </div>
+          <div class="notification-actions">
+            ${n.link ? `<a href="${n.link}" class="btn btn-ghost btn-sm"><i class="icon-arrow-right"></i></a>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      // 标记已读
+      container.querySelectorAll('.notification-item.unread').forEach(el => {
+        el.addEventListener('click', async () => {
+          const id = el.dataset.id;
+          await api.put(`/notifications/${id}/read`);
+          el.classList.remove('unread');
+        });
+      });
+
+      if (total_pages > 1) {
+        document.getElementById('pagination').innerHTML = pagination(currentPage, total_pages);
+        window.loadPage = p => loadNotifications(p);
+      }
+    }
+  </script>
+</body>
+</html>

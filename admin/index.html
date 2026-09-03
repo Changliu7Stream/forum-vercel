@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- 侧边栏 -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <i class="icon-message-circle" style="font-size:1.5rem;color:var(--accent);"></i>
+        <h1>论坛管理</h1>
+      </div>
+      <nav class="admin-nav">
+        <a href="/admin/index.html" class="admin-nav-item active">
+          <i class="icon-bar-chart-2"></i> 仪表盘
+        </a>
+        <div class="admin-nav-section">内容管理</div>
+        <a href="/admin/posts.html" class="admin-nav-item">
+          <i class="icon-file-text"></i> 帖子管理
+        </a>
+        <a href="/admin/users.html" class="admin-nav-item">
+          <i class="icon-users"></i> 用户管理
+        </a>
+        <a href="/admin/reports.html" class="admin-nav-item">
+          <i class="icon-flag"></i> 举报管理
+        </a>
+        <div class="admin-nav-section">系统设置</div>
+        <a href="/admin/categories.html" class="admin-nav-item">
+          <i class="icon-folder"></i> 分类管理
+        </a>
+        <a href="/admin/tags.html" class="admin-nav-item">
+          <i class="icon-tag"></i> 标签管理
+        </a>
+        <a href="/admin/settings.html" class="admin-nav-item">
+          <i class="icon-settings"></i> 系统设置
+        </a>
+        <div class="admin-nav-section">快捷链接</div>
+        <a href="/" class="admin-nav-item" target="_blank">
+          <i class="icon-external-link"></i> 访问前台
+        </a>
+      </nav>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="admin-main">
+      <header class="admin-header">
+        <div class="admin-header-left">
+          <button class="admin-menu-btn" id="menu-btn"><i class="icon-menu"></i></button>
+          <div class="admin-breadcrumb">
+            <a href="/admin/index.html">管理后台</a>
+          </div>
+        </div>
+        <div class="admin-header-right">
+          <a href="/" class="btn btn-ghost btn-sm" target="_blank"><i class="icon-external-link"></i> 访问前台</a>
+          <a href="/admin/settings.html" class="btn btn-ghost btn-sm"><i class="icon-settings"></i></a>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <h2 style="font-size:1.2rem;font-weight:600;margin-bottom:20px;">仪表盘</h2>
+
+        <!-- 统计卡片 -->
+        <div class="admin-stats" id="stats-grid">
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon blue"><i class="icon-users"></i></div>
+            <div class="admin-stat-info">
+              <h4>用户总数</h4>
+              <div class="value" id="stat-users">-</div>
+            </div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon green"><i class="icon-file-text"></i></div>
+            <div class="admin-stat-info">
+              <h4>帖子总数</h4>
+              <div class="value" id="stat-posts">-</div>
+            </div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon orange"><i class="icon-message-circle"></i></div>
+            <div class="admin-stat-info">
+              <h4>评论总数</h4>
+              <div class="value" id="stat-comments">-</div>
+            </div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon red"><i class="icon-flag"></i></div>
+            <div class="admin-stat-info">
+              <h4>待处理举报</h4>
+              <div class="value" id="stat-reports">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <!-- 最近帖子 -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <h3>最近帖子</h3>
+            </div>
+            <div id="recent-posts" class="loading"><div class="spinner"></div></div>
+          </div>
+
+          <!-- 最近用户 -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <h3>最近注册</h3>
+            </div>
+            <div id="recent-users" class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- 热门帖子 -->
+        <div class="chart-card mt-4">
+          <div class="chart-card-header">
+            <h3>热门帖子</h3>
+          </div>
+          <div id="hot-posts" class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 检查权限
+      if (!isLoggedIn()) {
+        window.location.href = '/login.html?redirect=/admin/index.html';
+        return;
+      }
+      const user = getUser();
+      if (user.role !== 'admin' && user.role !== 'moderator') {
+        Toast.error('无权访问管理后台');
+        window.location.href = '/';
+        return;
+      }
+
+      // 加载数据
+      const res = await api.get('/admin/dashboard');
+      if (!res || res.code !== 200) return;
+
+      const { stats, recent_posts, recent_users, hot_posts } = res.data;
+
+      // 统计
+      document.getElementById('stat-users').textContent = stats.total_users;
+      document.getElementById('stat-posts').textContent = stats.total_posts;
+      document.getElementById('stat-comments').textContent = stats.total_comments;
+      document.getElementById('stat-reports').textContent = stats.pending_reports;
+
+      // 最近帖子
+      if (recent_posts.length > 0) {
+        document.getElementById('recent-posts').innerHTML = `
+          <table class="data-table" style="border:none;">
+            <thead><tr><th>标题</th><th>作者</th><th>时间</th></tr></thead>
+            <tbody>
+              ${recent_posts.map(p => `
+                <tr>
+                  <td><a href="/post.html?id=${p.id}" target="_blank">${escapeHtml(p.title.substring(0, 40))}${p.title.length > 40 ? '...' : ''}</a></td>
+                  <td>${p.username}</td>
+                  <td class="text-muted">${timeAgo(p.created_at)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } else {
+        document.getElementById('recent-posts').innerHTML = '<div class="text-muted text-sm">暂无数据</div>';
+      }
+
+      // 最近用户
+      if (recent_users.length > 0) {
+        document.getElementById('recent-users').innerHTML = `
+          <table class="data-table" style="border:none;">
+            <thead><tr><th>用户名</th><th>邮箱</th><th>注册时间</th></tr></thead>
+            <tbody>
+              ${recent_users.map(u => `
+                <tr>
+                  <td>
+                    <div class="user-info-row">
+                      <img src="${getAvatarUrl(u)}" alt="${u.username}" onerror="this.outerHTML='${defaultAvatar(u.username, 28)}'">
+                      <span>${u.username}</span>
+                    </div>
+                  </td>
+                  <td class="text-muted">${u.email}</td>
+                  <td class="text-muted">${timeAgo(u.created_at)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } else {
+        document.getElementById('recent-users').innerHTML = '<div class="text-muted text-sm">暂无数据</div>';
+      }
+
+      // 热门帖子
+      if (hot_posts.length > 0) {
+        document.getElementById('hot-posts').innerHTML = `
+          <table class="data-table">
+            <thead><tr><th>标题</th><th>作者</th><th>浏览</th><th>点赞</th><th>评论</th></tr></thead>
+            <tbody>
+              ${hot_posts.map(p => `
+                <tr>
+                  <td><a href="/post.html?id=${p.id}" target="_blank">${escapeHtml(p.title.substring(0, 40))}${p.title.length > 40 ? '...' : ''}</a></td>
+                  <td>${p.username}</td>
+                  <td>${p.view_count}</td>
+                  <td>${p.like_count}</td>
+                  <td>${p.comment_count}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } else {
+        document.getElementById('hot-posts').innerHTML = '<div class="text-muted text-sm">暂无数据</div>';
+      }
+
+      // 移动端菜单
+      document.getElementById('menu-btn').addEventListener('click', () => {
+        document.querySelector('.admin-sidebar').classList.toggle('open');
+      });
+    });
+  </script>
+</body>
+</html>

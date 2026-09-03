@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>发布帖子 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar"><div class="navbar-inner"></div></header>
+
+  <main class="container container-sm">
+    <div class="page-header">
+      <a href="/" class="btn btn-ghost btn-sm mb-2"><i class="icon-arrow-left"></i> 返回</a>
+      <h1 class="page-title"><i class="icon-edit"></i> 发布帖子</h1>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <form id="post-form">
+          <div class="form-group">
+            <label class="form-label">标题 <span style="color:var(--danger)">*</span></label>
+            <input type="text" name="title" class="form-input" placeholder="请输入帖子标题" required maxlength="200" id="title-input">
+            <p class="form-hint"><span id="title-count">0</span>/200</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">分类</label>
+            <select name="category_id" class="form-select" id="category-select">
+              <option value="">选择分类</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">标签</label>
+            <div id="tag-selector" class="flex gap-2 flex-wrap" style="padding:10px 0;"></div>
+            <p class="form-hint">选择相关标签（可多选）</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">内容 <span style="color:var(--danger)">*</span></label>
+            <div class="editor-toolbar">
+              <button type="button" data-cmd="bold" title="粗体"><i class="icon-bold"></i></button>
+              <button type="button" data-cmd="italic" title="斜体"><i class="icon-italic"></i></button>
+              <button type="button" data-cmd="underline" title="下划线"><i class="icon-underline"></i></button>
+              <button type="button" data-cmd="heading" title="标题"><i class="icon-heading"></i></button>
+              <button type="button" data-cmd="quote" title="引用"><i class="icon-quote"></i></button>
+              <button type="button" data-cmd="code" title="代码"><i class="icon-code"></i></button>
+              <button type="button" data-cmd="list" title="列表"><i class="icon-list"></i></button>
+              <button type="button" data-cmd="link" title="链接"><i class="icon-link"></i></button>
+            </div>
+            <textarea name="content" class="editor-content" id="content-input" placeholder="请输入帖子内容...&#10;&#10;支持 Markdown 语法：&#10;# 标题&#10;**粗体** *斜体*&#10;- 列表项&#10;`行内代码`&#10;```代码块```" required></textarea>
+          </div>
+
+          <div id="form-error" class="form-error" style="display:none;margin-bottom:12px;"></div>
+
+          <div class="flex gap-2 justify-between">
+            <a href="/" class="btn btn-secondary">取消</a>
+            <button type="submit" class="btn btn-primary" id="submit-btn">
+              <i class="icon-send"></i> 发布帖子
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!isLoggedIn()) {
+        Toast.info('请先登录');
+        window.location.href = '/login.html?redirect=/new-post.html';
+        return;
+      }
+
+      initNavbar();
+
+      // 加载分类
+      const catRes = await api.get('/categories');
+      if (catRes && catRes.data) {
+        const select = document.getElementById('category-select');
+        catRes.data.forEach(c => {
+          select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+      }
+
+      // 加载标签
+      const tagRes = await api.get('/tags');
+      if (tagRes && tagRes.data) {
+        const container = document.getElementById('tag-selector');
+        tagRes.data.forEach(t => {
+          const label = document.createElement('label');
+          label.className = 'tag';
+          label.style.cursor = 'pointer';
+          label.innerHTML = `<input type="checkbox" name="tags" value="${t.id}" style="display:none;">${t.name}`;
+          label.addEventListener('click', e => {
+            if (e.target.tagName !== 'INPUT') {
+              const input = label.querySelector('input');
+              input.checked = !input.checked;
+              label.style.background = input.checked ? 'var(--accent-light)' : 'var(--accent-bg)';
+            }
+          });
+          container.appendChild(label);
+        });
+      }
+
+      // 标题计数
+      const titleInput = document.getElementById('title-input');
+      const titleCount = document.getElementById('title-count');
+      titleInput.addEventListener('input', () => {
+        titleCount.textContent = titleInput.value.length;
+      });
+
+      // 编辑器工具栏
+      document.querySelectorAll('.editor-toolbar button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cmd = btn.dataset.cmd;
+          const textarea = document.getElementById('content-input');
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const text = textarea.value;
+          const selected = text.substring(start, end);
+          let insert = '';
+          let cursor = start;
+
+          switch(cmd) {
+            case 'bold': insert = `**${selected || '粗体文本'}**`; cursor = start + 2; break;
+            case 'italic': insert = `*${selected || '斜体文本'}*`; cursor = start + 1; break;
+            case 'underline': insert = `<u>${selected || '下划线文本'}</u>`; cursor = start + 3; break;
+            case 'heading': insert = `\n## ${selected || '标题'}\n`; cursor = start + 4; break;
+            case 'quote': insert = `\n> ${selected || '引用文本'}\n`; cursor = start + 3; break;
+            case 'code': insert = selected.includes('\n') ? `\`\`\`\n${selected || '代码'}\n\`\`\`` : `\`${selected || '代码'}\``; cursor = start + (selected.includes('\n') ? 4 : 1); break;
+            case 'list': insert = `\n- ${selected || '列表项'}\n`; cursor = start + 3; break;
+            case 'link': insert = `[${selected || '链接文本'}](url)`; cursor = start + 1; break;
+          }
+
+          textarea.value = text.substring(0, start) + insert + text.substring(end);
+          textarea.focus();
+          textarea.setSelectionRange(cursor, cursor + (selected.length || insert.length - 4));
+        });
+      });
+
+      // 提交
+      const form = document.getElementById('post-form');
+      form.addEventListener('submit', async e => {
+        e.preventDefault();
+        const errorDiv = document.getElementById('form-error');
+        errorDiv.style.display = 'none';
+
+        const title = titleInput.value.trim();
+        const content = document.getElementById('content-input').value.trim();
+        const categoryId = document.getElementById('category-select').value;
+        const tagIds = [...document.querySelectorAll('input[name="tags"]:checked')].map(i => parseInt(i.value));
+
+        if (!title) { errorDiv.textContent = '请输入标题'; errorDiv.style.display = 'block'; return; }
+        if (!content) { errorDiv.textContent = '请输入内容'; errorDiv.style.display = 'block'; return; }
+
+        const submitBtn = document.getElementById('submit-btn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="icon-loader"></i> 发布中...';
+
+        const res = await api.post('/posts', {
+          title, content,
+          category_id: categoryId ? parseInt(categoryId) : null,
+          tag_ids: tagIds
+        });
+
+        if (res && res.code === 200) {
+          Toast.success('发布成功');
+          setTimeout(() => { window.location.href = `/post.html?id=${res.data.id}`; }, 500);
+        } else {
+          errorDiv.textContent = res?.message || '发布失败';
+          errorDiv.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="icon-send"></i> 发布帖子';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

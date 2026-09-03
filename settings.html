@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设置 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar"><div class="navbar-inner"></div></header>
+
+  <main class="container container-sm">
+    <div class="page-header">
+      <a href="/" class="btn btn-ghost btn-sm mb-2"><i class="icon-arrow-left"></i> 返回</a>
+      <h1 class="page-title"><i class="icon-settings"></i> 个人设置</h1>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><h3>个人资料</h3></div>
+      <div class="card-body">
+        <form id="profile-form">
+          <div class="form-group">
+            <label class="form-label">头像</label>
+            <div class="flex items-center gap-4">
+              <img src="" alt="头像" class="avatar avatar-lg" id="avatar-preview" onerror="this.style.display='none'">
+              <div>
+                <input type="text" name="avatar" class="form-input" placeholder="输入头像URL" id="avatar-input" style="width:300px;">
+                <p class="form-hint">输入图片URL作为头像</p>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">个人简介</label>
+            <textarea name="bio" class="form-textarea" rows="3" placeholder="介绍一下自己..." id="bio-input"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">个人网站</label>
+            <input type="url" name="website" class="form-input" placeholder="https://example.com" id="website-input">
+          </div>
+          <div id="profile-error" class="form-error" style="display:none;"></div>
+          <button type="submit" class="btn btn-primary" id="profile-btn">
+            <i class="icon-check"></i> 保存资料
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><h3>修改密码</h3></div>
+      <div class="card-body">
+        <form id="password-form">
+          <div class="form-group">
+            <label class="form-label">当前密码</label>
+            <input type="password" name="old_password" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">新密码</label>
+            <input type="password" name="new_password" class="form-input" required minlength="6">
+          </div>
+          <div class="form-group">
+            <label class="form-label">确认新密码</label>
+            <input type="password" name="confirm_password" class="form-input" required>
+          </div>
+          <div id="password-error" class="form-error" style="display:none;"></div>
+          <button type="submit" class="btn btn-primary" id="password-btn">
+            <i class="icon-lock"></i> 修改密码
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>积分记录</h3></div>
+      <div class="card-body" id="points-list">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!isLoggedIn()) {
+        window.location.href = '/login.html?redirect=/settings.html';
+        return;
+      }
+
+      initNavbar();
+      const user = getUser();
+
+      // 填充当前资料
+      document.getElementById('avatar-preview').src = getAvatarUrl(user);
+      document.getElementById('avatar-input').value = user.avatar || '';
+      document.getElementById('bio-input').value = user.bio || '';
+      document.getElementById('website-input').value = user.website || '';
+
+      // 头像预览
+      document.getElementById('avatar-input').addEventListener('input', e => {
+        document.getElementById('avatar-preview').src = e.target.value;
+      });
+
+      // 保存资料
+      document.getElementById('profile-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn = document.getElementById('profile-btn');
+        const errorDiv = document.getElementById('profile-error');
+        errorDiv.style.display = 'none';
+        btn.disabled = true;
+
+        const res = await api.put(`/users/${user.id}`, {
+          avatar: document.getElementById('avatar-input').value.trim(),
+          bio: document.getElementById('bio-input').value.trim(),
+          website: document.getElementById('website-input').value.trim()
+        });
+
+        if (res && res.code === 200) {
+          CurrentUser.set({ ...user, ...res.data });
+          Toast.success('资料已更新');
+        } else {
+          errorDiv.textContent = res?.message || '更新失败';
+          errorDiv.style.display = 'block';
+        }
+        btn.disabled = false;
+      });
+
+      // 修改密码
+      document.getElementById('password-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn = document.getElementById('password-btn');
+        const errorDiv = document.getElementById('password-error');
+        errorDiv.style.display = 'none';
+
+        const formData = new FormData(e.target);
+        if (formData.get('new_password') !== formData.get('confirm_password')) {
+          errorDiv.textContent = '两次密码输入不一致';
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        btn.disabled = true;
+        const res = await api.put('/auth/password', {
+          old_password: formData.get('old_password'),
+          new_password: formData.get('new_password')
+        });
+
+        if (res && res.code === 200) {
+          Toast.success('密码已修改');
+          e.target.reset();
+        } else {
+          errorDiv.textContent = res?.message || '修改失败';
+          errorDiv.style.display = 'block';
+        }
+        btn.disabled = false;
+      });
+
+      // 积分记录
+      const pointsRes = await api.get('/points/history');
+      const container = document.getElementById('points-list');
+      if (pointsRes && pointsRes.data.items.length > 0) {
+        container.innerHTML = pointsRes.data.items.slice(0, 20).map(p => `
+          <div class="flex items-center justify-between" style="padding:8px 0;border-bottom:1px solid var(--border-light);">
+            <div>
+              <div class="font-medium text-sm">${p.description || p.action}</div>
+              <div class="text-xs text-muted">${formatDate(p.created_at)}</div>
+            </div>
+            <span style="color:${p.points > 0 ? 'var(--success)' : 'var(--danger)'};font-weight:600;">
+              ${p.points > 0 ? '+' : ''}${p.points}
+            </span>
+          </div>
+        `).join('');
+      } else {
+        container.innerHTML = '<div class="text-muted text-sm">暂无积分记录</div>';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>编辑帖子 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar"><div class="navbar-inner"></div></header>
+
+  <main class="container container-sm">
+    <div class="page-header">
+      <a href="javascript:history.back()" class="btn btn-ghost btn-sm mb-2"><i class="icon-arrow-left"></i> 返回</a>
+      <h1 class="page-title"><i class="icon-edit"></i> 编辑帖子</h1>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <form id="post-form">
+          <div class="form-group">
+            <label class="form-label">标题</label>
+            <input type="text" name="title" class="form-input" required maxlength="200" id="title-input">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">分类</label>
+            <select name="category_id" class="form-select" id="category-select">
+              <option value="">选择分类</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">标签</label>
+            <div id="tag-selector" class="flex gap-2 flex-wrap" style="padding:10px 0;"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">内容</label>
+            <div class="editor-toolbar">
+              <button type="button" data-cmd="bold"><i class="icon-bold"></i></button>
+              <button type="button" data-cmd="italic"><i class="icon-italic"></i></button>
+              <button type="button" data-cmd="code"><i class="icon-code"></i></button>
+              <button type="button" data-cmd="quote"><i class="icon-quote"></i></button>
+              <button type="button" data-cmd="list"><i class="icon-list"></i></button>
+              <button type="button" data-cmd="link"><i class="icon-link"></i></button>
+            </div>
+            <textarea name="content" class="editor-content" id="content-input" required></textarea>
+          </div>
+
+          <div id="form-error" class="form-error" style="display:none;margin-bottom:12px;"></div>
+
+          <div class="flex gap-2 justify-between">
+            <a href="javascript:history.back()" class="btn btn-secondary">取消</a>
+            <button type="submit" class="btn btn-primary" id="submit-btn">
+              <i class="icon-check"></i> 保存修改
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!isLoggedIn()) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      initNavbar();
+
+      const postId = getQueryParam('id');
+      if (!postId) { window.location.href = '/'; return; }
+
+      // 加载帖子
+      const postRes = await api.get(`/posts/${postId}`);
+      if (!postRes || !postRes.data) { Toast.error('帖子不存在'); window.location.href = '/'; return; }
+      const post = postRes.data;
+
+      const user = getUser();
+      if (post.user_id !== user.id && user.role !== 'admin') {
+        Toast.error('无权编辑');
+        window.location.href = `/post.html?id=${postId}`;
+        return;
+      }
+
+      // 填充表单
+      document.getElementById('title-input').value = post.title;
+      document.getElementById('content-input').value = post.content;
+
+      // 分类
+      const catRes = await api.get('/categories');
+      if (catRes && catRes.data) {
+        const select = document.getElementById('category-select');
+        catRes.data.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          if (c.id === post.category_id) opt.selected = true;
+          select.appendChild(opt);
+        });
+      }
+
+      // 标签
+      const tagRes = await api.get('/tags');
+      if (tagRes && tagRes.data) {
+        const container = document.getElementById('tag-selector');
+        const selectedTags = new Set((post.tags || []).map(t => t.id));
+        tagRes.data.forEach(t => {
+          const label = document.createElement('label');
+          label.className = 'tag';
+          label.style.cursor = 'pointer';
+          const checked = selectedTags.has(t.id);
+          if (checked) label.style.background = 'var(--accent-light)';
+          label.innerHTML = `<input type="checkbox" name="tags" value="${t.id}" ${checked ? 'checked' : ''} style="display:none;">${t.name}`;
+          label.addEventListener('click', e => {
+            if (e.target.tagName !== 'INPUT') {
+              const input = label.querySelector('input');
+              input.checked = !input.checked;
+              label.style.background = input.checked ? 'var(--accent-light)' : 'var(--accent-bg)';
+            }
+          });
+          container.appendChild(label);
+        });
+      }
+
+      // 提交
+      document.getElementById('post-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const errorDiv = document.getElementById('form-error');
+        errorDiv.style.display = 'none';
+
+        const res = await api.put(`/posts/${postId}`, {
+          title: document.getElementById('title-input').value.trim(),
+          content: document.getElementById('content-input').value.trim(),
+          category_id: document.getElementById('category-select').value ? parseInt(document.getElementById('category-select').value) : null,
+          tag_ids: [...document.querySelectorAll('input[name="tags"]:checked')].map(i => parseInt(i.value))
+        });
+
+        if (res && res.code === 200) {
+          Toast.success('修改成功');
+          setTimeout(() => { window.location.href = `/post.html?id=${postId}`; }, 500);
+        } else {
+          errorDiv.textContent = res?.message || '修改失败';
+          errorDiv.style.display = 'block';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>论坛 - 首页</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <!-- 导航栏 -->
+  <header class="navbar">
+    <div class="navbar-inner"></div>
+  </header>
+
+  <!-- 主内容 -->
+  <main class="container">
+    <div class="main-layout">
+      <!-- 左侧主内容 -->
+      <div class="main-content">
+        <!-- 筛选排序 -->
+        <div class="card mb-4">
+          <div class="card-body" style="padding:12px 16px;">
+            <div class="flex items-center justify-between gap-4" style="flex-wrap:wrap;">
+              <div class="flex gap-2">
+                <a href="/?sort=latest" class="btn btn-sm sort-btn" data-sort="latest">最新</a>
+                <a href="/?sort=hot" class="btn btn-sm sort-btn" data-sort="hot">最热</a>
+                <a href="/?sort=featured" class="btn btn-sm sort-btn" data-sort="featured">精华</a>
+              </div>
+              <div class="flex gap-2 items-center">
+                <span class="text-sm text-muted">分类:</span>
+                <select id="category-filter" class="form-select" style="width:auto;padding:6px 10px;font-size:0.8rem;">
+                  <option value="">全部</option>
+                </select>
+              </div>
+              <a href="/new-post.html" class="btn btn-primary btn-sm" id="create-post-btn">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                发帖
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 帖子列表 -->
+        <div id="post-list">
+          <div class="loading"><div class="spinner"></div><span>加载中...</span></div>
+        </div>
+
+        <!-- 分页 -->
+        <div id="pagination"></div>
+      </div>
+
+      <!-- 右侧边栏 -->
+      <aside class="sidebar">
+        <!-- 分类 -->
+        <div class="card sidebar-card">
+          <div class="sidebar-card-header">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            分类
+          </div>
+          <div class="sidebar-card-body">
+            <ul class="sidebar-list" id="sidebar-categories">
+              <li><a href="/category.html">查看全部</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 热门标签 -->
+        <div class="card sidebar-card">
+          <div class="sidebar-card-header">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+            热门标签
+          </div>
+          <div class="sidebar-card-body" id="sidebar-tags"></div>
+        </div>
+
+        <!-- 统计 -->
+        <div class="card sidebar-card">
+          <div class="sidebar-card-header">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            站点统计
+          </div>
+          <div class="sidebar-card-body">
+            <div class="sidebar-list">
+              <a href="#"><span>会员</span> <span class="count" id="stat-users">-</span></a>
+              <a href="#"><span>帖子</span> <span class="count" id="stat-posts">-</span></a>
+              <a href="#"><span>评论</span> <span class="count" id="stat-comments">-</span></a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 快捷入口 -->
+        <div class="card sidebar-card">
+          <div class="sidebar-card-header">快捷入口</div>
+          <div class="sidebar-card-body">
+            <div class="flex gap-2" style="flex-wrap:wrap;">
+              <a href="/new-post.html" class="btn btn-primary btn-sm">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                发帖
+              </a>
+              <a href="/search.html" class="btn btn-secondary btn-sm">搜索</a>
+              <a href="/category.html" class="btn btn-secondary btn-sm">分类</a>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      initNavbar();
+
+      const params = new URLSearchParams(window.location.search);
+      const sort = params.get('sort') || 'latest';
+      const categoryId = params.get('category') || null;
+
+      // 激活排序按钮
+      document.querySelectorAll('.sort-btn').forEach(btn => {
+        if (btn.dataset.sort === sort) btn.classList.add('btn-primary');
+        else btn.classList.remove('btn-primary');
+      });
+
+      // 发帖按钮：未登录时跳转登录页
+      const postBtn = document.getElementById('create-post-btn');
+      if (postBtn && !isLoggedIn()) {
+        postBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          Toast.info('请先登录');
+          window.location.href = '/login.html?redirect=/new-post.html';
+        });
+      }
+
+      // 加载分类筛选
+      const catRes = await api.get('/categories');
+      if (catRes && catRes.data) {
+        const select = document.getElementById('category-filter');
+        catRes.data.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          if (categoryId == c.id) opt.selected = true;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener('change', () => {
+          const id = select.value;
+          if (id) window.location.href = `/?sort=${sort}&category=${id}`;
+          else window.location.href = `/?sort=${sort}`;
+        });
+      }
+
+      // 加载帖子
+      await loadPosts({ sort, category_id: categoryId, showPagination: true });
+
+      // 加载侧边栏
+      await Promise.all([
+        renderSidebarCategories(),
+        renderSidebarTags()
+      ]);
+
+      // 加载统计
+      const dashRes = await api.get('/admin/dashboard');
+      if (dashRes && dashRes.data && dashRes.data.stats) {
+        const s = dashRes.data.stats;
+        document.getElementById('stat-users').textContent = s.total_users;
+        document.getElementById('stat-posts').textContent = s.total_posts;
+        document.getElementById('stat-comments').textContent = s.total_comments;
+      }
+    });
+  </script>
+</body>
+</html>

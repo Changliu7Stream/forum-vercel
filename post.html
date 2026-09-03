@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>帖子详情 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-inner"></div>
+  </header>
+
+  <main class="container container-sm">
+    <div class="page-header">
+      <a href="/" class="btn btn-ghost btn-sm mb-2"><i class="icon-arrow-left"></i> 返回</a>
+    </div>
+
+    <!-- 帖子内容 -->
+    <article class="card mb-4" id="post-container">
+      <div class="loading"><div class="spinner"></div><span>加载中...</span></div>
+    </article>
+
+    <!-- 操作栏 -->
+    <div class="card mb-4" id="action-bar" style="display:none;">
+      <div class="card-body" style="padding:12px 16px;">
+        <div class="flex items-center justify-between">
+          <div class="flex gap-2">
+            <button class="action-btn" id="like-btn">
+              <i class="icon-thumbs-up"></i>
+              <span>0</span>
+            </button>
+            <button class="action-btn" id="favorite-btn">
+              <i class="icon-bookmark"></i>
+              <span>收藏</span>
+            </button>
+            <button class="action-btn" id="report-btn">
+              <i class="icon-flag"></i>
+              <span>举报</span>
+            </button>
+          </div>
+          <div class="flex gap-2" id="post-manage-btns"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 评论区域 -->
+    <div class="card mb-4" id="comment-section">
+      <div class="card-header">
+        <h3><i class="icon-message-circle"></i> 评论 <span id="comment-count"></span></h3>
+      </div>
+      <div class="card-body" id="comment-list">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- 发表评论 -->
+    <div class="card" id="comment-form">
+      <div class="card-header">
+        <h3 id="comment-form-title"><i class="icon-edit"></i> 发表评论</h3>
+      </div>
+      <div class="card-body">
+        <div id="login-tip" class="empty-state" style="padding:20px;">
+          <p><a href="/login.html">登录</a>后参与评论</p>
+        </div>
+        <div id="comment-editor" style="display:none;">
+          <textarea id="comment-input" class="form-textarea" rows="4" placeholder="说点什么..."></textarea>
+          <div class="flex justify-between items-center mt-2">
+            <span class="text-sm text-muted">支持 Markdown 语法</span>
+            <button class="btn btn-primary" id="submit-comment-btn">
+              <i class="icon-send"></i> 发布
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    let currentPost = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      initNavbar();
+
+      const postId = getQueryParam('id');
+      if (!postId) {
+        document.getElementById('post-container').innerHTML = '<div class="empty-state"><i class="icon-alert-circle"></i><h3>帖子不存在</h3><p><a href="/">返回首页</a></p></div>';
+        return;
+      }
+
+      // 加载帖子
+      const postRes = await api.get(`/posts/${postId}`);
+      if (!postRes || !postRes.data) {
+        document.getElementById('post-container').innerHTML = '<div class="empty-state"><i class="icon-alert-circle"></i><h3>帖子不存在或已被删除</h3><p><a href="/">返回首页</a></p></div>';
+        return;
+      }
+
+      currentPost = postRes.data;
+      renderPost(currentPost);
+
+      // 增加浏览量
+      api.post(`/posts/${postId}/view`);
+
+      // 加载评论
+      const commentRes = await api.get(`/posts/${postId}/comments`);
+      if (commentRes && commentRes.code === 200) {
+        document.getElementById('comment-count').textContent = `(${commentRes.data.length})`;
+        renderCommentList(commentRes.data, postId);
+      }
+
+      // 评论表单
+      if (isLoggedIn()) {
+        document.getElementById('login-tip').style.display = 'none';
+        document.getElementById('comment-editor').style.display = 'block';
+      }
+
+      document.getElementById('submit-comment-btn').addEventListener('click', () => submitComment(postId));
+
+      // 键盘提交
+      document.getElementById('comment-input').addEventListener('keydown', e => {
+        if (e.ctrlKey && e.key === 'Enter') submitComment(postId);
+      });
+    });
+
+    function renderPost(post) {
+      const user = getUser();
+      const isAuthor = user && user.id === post.user_id;
+      const isAdmin = user && (user.role === 'admin' || user.role === 'moderator');
+      const canEdit = isAuthor || isAdmin;
+
+      const badges = [];
+      if (post.is_pinned) badges.push('<span class="badge badge-pin"><i class="icon-pin"></i> 置顶</span>');
+      if (post.is_featured) badges.push('<span class="badge badge-feature"><i class="icon-award"></i> 精华</span>');
+
+      const tags = (post.tags || []).map(t =>
+        `<a href="/search.html?tag=${t.slug}" class="tag">${t.name}</a>`
+      ).join('');
+
+      document.getElementById('post-container').innerHTML = `
+        ${badges.length ? `<div style="padding:12px 20px 0;">${badges.join('')}</div>` : ''}
+        <div class="card-body">
+          <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:16px;line-height:1.4;">${escapeHtml(post.title)}</h1>
+
+          <div class="flex items-center gap-4 mb-4" style="padding-bottom:16px;border-bottom:1px solid var(--border-color);">
+            <a href="/profile.html?id=${post.user_id}" class="flex items-center gap-2">
+              <img src="${getAvatarUrl(post)}" alt="${post.username}" class="avatar avatar-md" onerror="this.outerHTML='${defaultAvatar(post.username, 40)}'">
+              <div>
+                <div class="font-medium">${post.username}</div>
+                <div class="text-xs text-muted">Lv.${post.level || 1} · ${timeAgo(post.created_at)}</div>
+              </div>
+            </a>
+            ${post.category_name ? `<a href="/category.html?id=${post.category_id}" class="badge badge-category">${post.category_name}</a>` : ''}
+          </div>
+
+          ${tags ? `<div class="mb-4">${tags}</div>` : ''}
+
+          <div class="content-body">${renderMarkdown(post.content)}</div>
+
+          <div class="flex items-center gap-4 mt-4 pt-4" style="border-top:1px solid var(--border-color);color:var(--text-muted);font-size:0.8rem;">
+            <span><i class="icon-eye"></i> ${formatNumber(post.view_count)} 浏览</span>
+            <span><i class="icon-thumbs-up"></i> ${formatNumber(post.like_count)} 点赞</span>
+            <span><i class="icon-message-circle"></i> ${formatNumber(post.comment_count)} 评论</span>
+            <span><i class="icon-clock"></i> ${formatDate(post.created_at)}</span>
+          </div>
+        </div>
+      `;
+
+      // 操作栏
+      document.getElementById('action-bar').style.display = 'flex';
+      const likeBtn = document.getElementById('like-btn');
+      likeBtn.querySelector('span').textContent = formatNumber(post.like_count);
+      if (post.is_liked) likeBtn.classList.add('active');
+      likeBtn.addEventListener('click', async () => {
+        if (!isLoggedIn()) { Toast.info('请先登录'); return; }
+        const isActive = likeBtn.classList.toggle('active');
+        const count = parseInt(likeBtn.querySelector('span').textContent) || 0;
+        likeBtn.querySelector('span').textContent = isActive ? count + 1 : Math.max(0, count - 1);
+        if (isActive) await api.post(`/posts/${post.id}/like`);
+        else await api.delete(`/posts/${post.id}/like`);
+      });
+
+      const favBtn = document.getElementById('favorite-btn');
+      if (post.is_favorited) {
+        favBtn.classList.add('active');
+        favBtn.querySelector('span').textContent = '已收藏';
+      }
+      favBtn.addEventListener('click', async () => {
+        if (!isLoggedIn()) { Toast.info('请先登录'); return; }
+        const isActive = favBtn.classList.toggle('active');
+        favBtn.querySelector('span').textContent = isActive ? '已收藏' : '收藏';
+        if (isActive) await api.post(`/posts/${post.id}/favorite`);
+        else await api.delete(`/posts/${post.id}/favorite`);
+      });
+
+      document.getElementById('report-btn').addEventListener('click', async () => {
+        if (!isLoggedIn()) { Toast.info('请先登录'); return; }
+        const reason = prompt('请输入举报原因：');
+        if (reason) {
+          const res = await api.post('/reports', { post_id: post.id, reason });
+          if (res && res.code === 200) Toast.success('举报已提交');
+        }
+      });
+
+      // 管理按钮
+      if (canEdit) {
+        document.getElementById('post-manage-btns').innerHTML = `
+          ${isAuthor || isAdmin ? `<a href="/edit-post.html?id=${post.id}" class="btn btn-secondary btn-sm"><i class="icon-edit"></i> 编辑</a>` : ''}
+          ${isAdmin ? `
+            <button class="btn btn-secondary btn-sm" id="toggle-pin-btn">
+              <i class="icon-pin"></i> ${post.is_pinned ? '取消置顶' : '置顶'}
+            </button>
+            <button class="btn btn-secondary btn-sm" id="toggle-feature-btn">
+              <i class="icon-award"></i> ${post.is_featured ? '取消精华' : '精华'}
+            </button>
+          ` : ''}
+          ${isAuthor || isAdmin ? `
+            <button class="btn btn-danger btn-sm" id="delete-post-btn">
+              <i class="icon-trash-2"></i> 删除
+            </button>
+          ` : ''}
+        `;
+
+        if (isAdmin) {
+          document.getElementById('toggle-pin-btn').addEventListener('click', async () => {
+            await api.post(`/posts/admin/${post.id}/pin`, { is_pinned: !post.is_pinned });
+            Toast.success(post.is_pinned ? '已取消置顶' : '已置顶');
+            post.is_pinned = !post.is_pinned;
+            document.getElementById('toggle-pin-btn').innerHTML = `<i class="icon-pin"></i> ${post.is_pinned ? '取消置顶' : '置顶'}`;
+          });
+
+          document.getElementById('toggle-feature-btn').addEventListener('click', async () => {
+            await api.post(`/posts/admin/${post.id}/feature`, { is_featured: !post.is_featured });
+            Toast.success(post.is_featured ? '已取消精华' : '已设为精华');
+            post.is_featured = !post.is_featured;
+            document.getElementById('toggle-feature-btn').innerHTML = `<i class="icon-award"></i> ${post.is_featured ? '取消精华' : '精华'}`;
+          });
+        }
+
+        document.getElementById('delete-post-btn')?.addEventListener('click', async () => {
+          if (!confirm('确定删除这篇帖子？')) return;
+          const res = await api.delete(`/posts/${post.id}`);
+          if (res && res.code === 200) {
+            Toast.success('已删除');
+            setTimeout(() => { window.location.href = '/'; }, 1000);
+          }
+        });
+      }
+
+      setPageTitle(post.title);
+    }
+  </script>
+</body>
+</html>

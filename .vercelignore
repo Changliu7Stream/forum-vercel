@@ -1,0 +1,9 @@
+node_modules
+forum.db
+forum.db-*
+.env
+server.log
+*.log
+.git
+.github
+templates

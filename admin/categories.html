@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分类管理 - 管理后台</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <i class="icon-message-circle" style="font-size:1.5rem;color:var(--accent);"></i>
+        <h1>论坛管理</h1>
+      </div>
+      <nav class="admin-nav">
+        <a href="/admin/index.html" class="admin-nav-item"><i class="icon-bar-chart-2"></i> 仪表盘</a>
+        <a href="/admin/posts.html" class="admin-nav-item"><i class="icon-file-text"></i> 帖子管理</a>
+        <a href="/admin/users.html" class="admin-nav-item"><i class="icon-users"></i> 用户管理</a>
+        <a href="/admin/reports.html" class="admin-nav-item"><i class="icon-flag"></i> 举报管理</a>
+        <a href="/admin/categories.html" class="admin-nav-item active"><i class="icon-folder"></i> 分类管理</a>
+        <a href="/admin/tags.html" class="admin-nav-item"><i class="icon-tag"></i> 标签管理</a>
+        <a href="/admin/settings.html" class="admin-nav-item"><i class="icon-settings"></i> 系统设置</a>
+        <a href="/" class="admin-nav-item" target="_blank"><i class="icon-external-link"></i> 访问前台</a>
+      </nav>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <div class="admin-header-left">
+          <button class="admin-menu-btn" id="menu-btn"><i class="icon-menu"></i></button>
+          <div class="admin-breadcrumb"><a href="/admin/index.html">管理后台</a> <i class="icon-chevron-right"></i> 分类管理</div>
+        </div>
+        <div class="admin-header-right">
+          <button class="btn btn-primary btn-sm" id="add-btn"><i class="icon-plus"></i> 新增分类</button>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <div class="data-table">
+          <div class="data-table-header"><h3>分类列表</h3></div>
+          <div id="category-table">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 编辑弹窗 -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">新增分类</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closeModal()"><i class="icon-x"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="category-form">
+          <input type="hidden" id="edit-id">
+          <div class="form-group">
+            <label class="form-label">名称</label>
+            <input type="text" class="form-input" id="cat-name" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">描述</label>
+            <textarea class="form-textarea" id="cat-desc" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">图标</label>
+            <input type="text" class="form-input" id="cat-icon" placeholder="如: code, folder, message-circle">
+          </div>
+          <div class="form-group">
+            <label class="form-label">排序</label>
+            <input type="number" class="form-input" id="cat-order" value="0" min="0">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" id="save-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script>
+    let categories = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
+      const user = getUser();
+      if (user.role !== 'admin') { Toast.error('仅管理员可访问'); window.location.href = '/'; return; }
+
+      document.getElementById('menu-btn').addEventListener('click', () => {
+        document.querySelector('.admin-sidebar').classList.toggle('open');
+      });
+
+      document.getElementById('add-btn').addEventListener('click', () => openModal());
+      document.getElementById('save-btn').addEventListener('click', saveCategory);
+
+      await loadCategories();
+    });
+
+    async function loadCategories() {
+      const res = await api.get('/categories');
+      const container = document.getElementById('category-table');
+      if (!res || !res.data) return;
+      categories = res.data;
+
+      container.innerHTML = `
+        <table>
+          <thead><tr><th>图标</th><th>名称</th><th>描述</th><th>帖子数</th><th>排序</th><th>操作</th></tr></thead>
+          <tbody>
+            ${categories.map(c => `
+              <tr>
+                <td><i class="icon-${c.icon || 'folder'}" style="font-size:20px;color:var(--accent);"></i></td>
+                <td><strong>${c.name}</strong></td>
+                <td class="text-muted">${c.description || '-'}</td>
+                <td>${c.post_count}</td>
+                <td>${c.sort_order}</td>
+                <td>
+                  <div class="actions">
+                    <button class="btn btn-ghost btn-sm" onclick="editCategory(${c.id})"><i class="icon-edit"></i></button>
+                    <button class="btn btn-ghost btn-sm" onclick="deleteCategory(${c.id})"><i class="icon-trash-2"></i></button>
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function openModal(id = null) {
+      document.getElementById('edit-modal').classList.add('show');
+      document.getElementById('modal-title').textContent = id ? '编辑分类' : '新增分类';
+      document.getElementById('edit-id').value = id || '';
+      document.getElementById('cat-name').value = '';
+      document.getElementById('cat-desc').value = '';
+      document.getElementById('cat-icon').value = '';
+      document.getElementById('cat-order').value = '0';
+
+      if (id) {
+        const cat = categories.find(c => c.id === id);
+        if (cat) {
+          document.getElementById('cat-name').value = cat.name;
+          document.getElementById('cat-desc').value = cat.description || '';
+          document.getElementById('cat-icon').value = cat.icon || '';
+          document.getElementById('cat-order').value = cat.sort_order || 0;
+        }
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('edit-modal').classList.remove('show');
+    }
+
+    async function editCategory(id) {
+      openModal(id);
+    }
+
+    async function saveCategory() {
+      const id = document.getElementById('edit-id').value;
+      const data = {
+        name: document.getElementById('cat-name').value.trim(),
+        description: document.getElementById('cat-desc').value.trim(),
+        icon: document.getElementById('cat-icon').value.trim() || 'folder',
+        sort_order: parseInt(document.getElementById('cat-order').value) || 0
+      };
+
+      if (!data.name) { Toast.error('名称不能为空'); return; }
+
+      const btn = document.getElementById('save-btn');
+      btn.disabled = true;
+
+      let res;
+      if (id) {
+        res = await api.put(`/categories/${id}`, data);
+      } else {
+        res = await api.post('/categories', data);
+      }
+
+      btn.disabled = false;
+      if (res && res.code === 200) { Toast.success(id ? '已更新' : '已创建'); closeModal(); loadCategories(); }
+      else { Toast.error('保存失败'); }
+    }
+
+    async function deleteCategory(id) {
+      if (!confirm('确定删除该分类？')) return;
+      const res = await api.delete(`/categories/${id}`);
+      if (res && res.code === 200) { Toast.success('已删除'); loadCategories(); }
+      else { Toast.error(res?.message || '删除失败'); }
+    }
+  </script>
+</body>
+</html>

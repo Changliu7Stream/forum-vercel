@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的收藏 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar"><div class="navbar-inner"></div></header>
+
+  <main class="container">
+    <div class="page-header">
+      <a href="/" class="btn btn-ghost btn-sm mb-2"><i class="icon-arrow-left"></i> 返回</a>
+      <h1 class="page-title"><i class="icon-bookmark"></i> 我的收藏</h1>
+    </div>
+
+    <div class="card">
+      <div id="post-list"><div class="loading"><div class="spinner"></div></div></div>
+      <div id="pagination"></div>
+    </div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    let currentPage = 1;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!isLoggedIn()) {
+        window.location.href = '/login.html?redirect=/favorites.html';
+        return;
+      }
+
+      initNavbar();
+      await loadFavorites();
+    });
+
+    async function loadFavorites(page = 1) {
+      currentPage = page;
+      const res = await api.get(`/favorites?page=${page}`);
+      const container = document.getElementById('post-list');
+
+      if (!res || res.data.items.length === 0) {
+        container.innerHTML = emptyState('icon-bookmark', '暂无收藏', '收藏你喜欢的帖子，方便以后查看');
+        return;
+      }
+
+      renderPostList(res.data.items, 'post-list');
+
+      if (res.data.total_pages > 1) {
+        document.getElementById('pagination').innerHTML = pagination(currentPage, res.data.total_pages);
+        window.loadPage = p => loadFavorites(p);
+      }
+    }
+  </script>
+</body>
+</html>

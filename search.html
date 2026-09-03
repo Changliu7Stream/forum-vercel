@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>搜索 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar"><div class="navbar-inner"></div></header>
+
+  <main class="container">
+    <div class="page-header">
+      <h1 class="page-title"><i class="icon-search"></i> 搜索</h1>
+    </div>
+
+    <!-- 搜索表单 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <form id="search-form">
+          <div class="flex gap-2 mb-4">
+            <input type="text" name="q" class="form-input" placeholder="输入关键词搜索帖子..." id="search-input" style="flex:1;">
+            <button type="submit" class="btn btn-primary"><i class="icon-search"></i> 搜索</button>
+          </div>
+          <div class="flex gap-4 flex-wrap">
+            <div class="flex items-center gap-2">
+              <label class="text-sm">分类:</label>
+              <select name="category" class="form-select" id="search-category" style="width:auto;padding:6px 10px;">
+                <option value="">全部</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm">标签:</label>
+              <select name="tag" class="form-select" id="search-tag" style="width:auto;padding:6px 10px;">
+                <option value="">全部</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 搜索结果 -->
+    <div class="card">
+      <div class="card-header">
+        <h3 id="result-title">搜索结果</h3>
+        <span class="text-sm text-muted" id="result-count"></span>
+      </div>
+      <div id="post-list"><div class="empty-state"><i class="icon-search"></i><h3>输入关键词开始搜索</h3></div></div>
+      <div id="pagination"></div>
+    </div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      initNavbar();
+
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('q') || '';
+      const category = params.get('category') || '';
+      const tag = params.get('tag') || '';
+      let page = parseInt(params.get('page')) || 1;
+
+      // 填充表单
+      document.getElementById('search-input').value = q;
+
+      // 加载分类
+      const catRes = await api.get('/categories');
+      if (catRes && catRes.data) {
+        const select = document.getElementById('search-category');
+        catRes.data.forEach(c => {
+          select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+        select.value = category;
+      }
+
+      // 加载标签
+      const tagRes = await api.get('/tags/popular');
+      if (tagRes && tagRes.data) {
+        const select = document.getElementById('search-tag');
+        tagRes.data.forEach(t => {
+          select.innerHTML += `<option value="${t.slug}">${t.name}</option>`;
+        });
+        select.value = tag;
+      }
+
+      // 执行搜索
+      async function doSearch() {
+        const q = document.getElementById('search-input').value.trim();
+        const cat = document.getElementById('search-category').value;
+        const t = document.getElementById('search-tag').value;
+
+        if (!q && !cat && !t) {
+          document.getElementById('post-list').innerHTML = '<div class="empty-state"><i class="icon-search"></i><h3>请输入搜索条件</h3></div>';
+          return;
+        }
+
+        const searchParams = new URLSearchParams();
+        if (q) searchParams.set('q', q);
+        if (cat) searchParams.set('category_id', cat);
+        if (t) searchParams.set('tag', t);
+        searchParams.set('page', page);
+
+        document.getElementById('post-list').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+        const res = await api.get(`/search?${searchParams}`);
+        if (res && res.code === 200) {
+          const { items, total } = res.data;
+          document.getElementById('result-title').textContent = q ? `搜索: "${q}"` : '搜索结果';
+          document.getElementById('result-count').textContent = `共 ${total} 个结果`;
+
+          if (items.length === 0) {
+            document.getElementById('post-list').innerHTML = emptyState('icon-search', '没有找到结果', '尝试其他关键词或筛选条件');
+          } else {
+            renderPostList(items, 'post-list');
+          }
+
+          if (res.data.total_pages > 1) {
+            document.getElementById('pagination').innerHTML = pagination(page, res.data.total_pages);
+            window.loadPage = p => {
+              page = p;
+              const newParams = new URLSearchParams(window.location.search);
+              newParams.set('page', p);
+              window.location.search = newParams.toString();
+            };
+          }
+        }
+      }
+
+      // 表单提交
+      document.getElementById('search-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const q = document.getElementById('search-input').value.trim();
+        const cat = document.getElementById('search-category').value;
+        const t = document.getElementById('search-tag').value;
+
+        const params = new URLSearchParams();
+        if (q) params.set('q', q);
+        if (cat) params.set('category', cat);
+        if (t) params.set('tag', t);
+        window.location.search = params.toString();
+      });
+
+      // 初始搜索
+      if (q || category || tag) {
+        await doSearch();
+      }
+    });
+  </script>
+</body>
+</html>

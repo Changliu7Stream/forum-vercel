@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分类 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar"><div class="navbar-inner"></div></header>
+
+  <main class="container">
+    <div class="page-header">
+      <h1 class="page-title"><i class="icon-folder"></i> 所有分类</h1>
+      <p class="page-subtitle">按分类浏览帖子</p>
+    </div>
+
+    <div class="stats-grid mb-4" id="category-grid">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 id="category-title">帖子列表</h3>
+        <div class="flex gap-2">
+          <a href="/?sort=latest" class="btn btn-sm sort-btn" data-sort="latest">最新</a>
+          <a href="/?sort=hot" class="btn btn-sm sort-btn" data-sort="hot">最热</a>
+        </div>
+      </div>
+      <div id="post-list"><div class="loading"><div class="spinner"></div></div></div>
+      <div id="pagination"></div>
+    </div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      initNavbar();
+
+      const categoryId = getQueryParam('id');
+      const params = new URLSearchParams(window.location.search);
+      const sort = params.get('sort') || 'latest';
+
+      // 加载所有分类
+      const catRes = await api.get('/categories');
+      if (catRes && catRes.data) {
+        const grid = document.getElementById('category-grid');
+        grid.innerHTML = catRes.data.map(c => `
+          <a href="/category.html?id=${c.id}" class="stat-card" style="text-decoration:none;color:inherit;">
+            <div class="stat-icon">
+              <i class="icon-${c.icon || 'folder'}"></i>
+            </div>
+            <div class="stat-info">
+              <h4>${c.name}</h4>
+              <div class="value" style="font-size:1rem;">${c.post_count} 帖子</div>
+            </div>
+          </a>
+        `).join('');
+      }
+
+      if (categoryId) {
+        // 加载指定分类
+        const catRes = await api.get(`/categories/${categoryId}`);
+        if (catRes && catRes.data) {
+          document.getElementById('category-title').textContent = catRes.data.name;
+          setPageTitle(catRes.data.name);
+        }
+
+        // 激活排序按钮
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+          if (btn.dataset.sort === sort) btn.classList.add('btn-primary');
+        });
+
+        await loadPosts({ sort, category_id: parseInt(categoryId), showPagination: true });
+      } else {
+        // 显示最新帖子
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+          if (btn.dataset.sort === 'latest') btn.classList.add('btn-primary');
+        });
+        await loadPosts({ sort: 'latest', showPagination: true });
+      }
+    });
+  </script>
+</body>
+</html>

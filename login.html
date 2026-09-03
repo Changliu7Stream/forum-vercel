@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: var(--bg-secondary);
+    }
+    .auth-container {
+      width: 100%;
+      max-width: 400px;
+      background: var(--bg-primary);
+      border-radius: var(--radius-xl);
+      padding: 40px;
+      box-shadow: var(--shadow-lg);
+    }
+    .auth-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .auth-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 24px;
+      text-decoration: none;
+    }
+    .auth-logo svg { color: var(--accent); }
+    .auth-header h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 8px; }
+    .auth-header p { color: var(--text-muted); font-size: 0.9rem; }
+    .auth-form { margin-bottom: 24px; }
+    .auth-footer {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+    .auth-footer p { margin-bottom: 8px; }
+    .auth-footer a { color: var(--accent); }
+    @media (max-width: 480px) {
+      .auth-container { padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-container">
+      <div class="auth-header">
+        <a href="/" class="auth-logo">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>论坛</span>
+        </a>
+        <h1>登录账户</h1>
+        <p>欢迎回来！</p>
+      </div>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label">用户名 / 邮箱</label>
+          <input type="text" name="username" class="form-input" placeholder="请输入用户名或邮箱" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">密码</label>
+          <input type="password" name="password" class="form-input" placeholder="请输入密码" required autocomplete="current-password">
+        </div>
+
+        <div id="form-error" class="form-error" style="display:none;margin-bottom:12px;"></div>
+        <div id="form-success" class="text-sm" style="display:none;margin-bottom:12px;color:var(--success);"></div>
+
+        <button type="submit" class="btn btn-primary btn-lg w-full" id="submit-btn">
+          <span id="btn-text">登录</span>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <p>还没有账户？ <a href="/register.html">立即注册</a></p>
+        <p><a href="/">返回首页</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 简单的 API 调用
+    const API_BASE = '/api';
+    
+    function getToken() {
+      return localStorage.getItem('forum_token');
+    }
+    
+    function setToken(token) {
+      localStorage.setItem('forum_token', token);
+    }
+    
+    function setUser(user) {
+      localStorage.setItem('forum_user', JSON.stringify(user));
+    }
+    
+    function getUser() {
+      const data = localStorage.getItem('forum_user');
+      return data ? JSON.parse(data) : null;
+    }
+    
+    function clearAuth() {
+      localStorage.removeItem('forum_token');
+      localStorage.removeItem('forum_user');
+    }
+
+    async function login(username, password) {
+      const response = await fetch(API_BASE + '/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username, password })
+      });
+      
+      const data = await response.json();
+      
+      if (data.code === 200) {
+        setToken(data.data.token);
+        setUser(data.data.user);
+        return { success: true, message: '登录成功' };
+      } else {
+        return { success: false, message: data.message || '登录失败' };
+      }
+    }
+
+    // 页面加载
+    document.addEventListener('DOMContentLoaded', function() {
+      // 如果已登录，跳转
+      if (getToken() && getUser()) {
+        window.location.href = '/';
+        return;
+      }
+
+      const form = document.getElementById('login-form');
+      const submitBtn = document.getElementById('submit-btn');
+      const btnText = document.getElementById('btn-text');
+      const errorDiv = document.getElementById('form-error');
+      const successDiv = document.getElementById('form-success');
+
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const username = form.username.value.trim();
+        const password = form.password.value;
+        
+        if (!username || !password) {
+          errorDiv.textContent = '请输入用户名和密码';
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        errorDiv.style.display = 'none';
+        successDiv.style.display = 'none';
+        submitBtn.disabled = true;
+        btnText.textContent = '登录中...';
+
+        try {
+          const result = await login(username, password);
+          
+          if (result.success) {
+            successDiv.textContent = '登录成功，跳转中...';
+            successDiv.style.display = 'block';
+            setTimeout(function() {
+              const params = new URLSearchParams(window.location.search);
+              const redirect = params.get('redirect') || '/';
+              window.location.href = redirect;
+            }, 500);
+          } else {
+            errorDiv.textContent = result.message;
+            errorDiv.style.display = 'block';
+            submitBtn.disabled = false;
+            btnText.textContent = '登录';
+          }
+        } catch (err) {
+          errorDiv.textContent = '网络错误，请稍后重试';
+          errorDiv.style.display = 'block';
+          submitBtn.disabled = false;
+          btnText.textContent = '登录';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>举报管理 - 管理后台</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <i class="icon-message-circle" style="font-size:1.5rem;color:var(--accent);"></i>
+        <h1>论坛管理</h1>
+      </div>
+      <nav class="admin-nav">
+        <a href="/admin/index.html" class="admin-nav-item"><i class="icon-bar-chart-2"></i> 仪表盘</a>
+        <a href="/admin/posts.html" class="admin-nav-item"><i class="icon-file-text"></i> 帖子管理</a>
+        <a href="/admin/users.html" class="admin-nav-item"><i class="icon-users"></i> 用户管理</a>
+        <a href="/admin/reports.html" class="admin-nav-item active"><i class="icon-flag"></i> 举报管理</a>
+        <a href="/admin/categories.html" class="admin-nav-item"><i class="icon-folder"></i> 分类管理</a>
+        <a href="/admin/tags.html" class="admin-nav-item"><i class="icon-tag"></i> 标签管理</a>
+        <a href="/admin/settings.html" class="admin-nav-item"><i class="icon-settings"></i> 系统设置</a>
+        <a href="/" class="admin-nav-item" target="_blank"><i class="icon-external-link"></i> 访问前台</a>
+      </nav>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <div class="admin-header-left">
+          <button class="admin-menu-btn" id="menu-btn"><i class="icon-menu"></i></button>
+          <div class="admin-breadcrumb"><a href="/admin/index.html">管理后台</a> <i class="icon-chevron-right"></i> 举报管理</div>
+        </div>
+        <div class="admin-header-right">
+          <select class="form-select" id="status-filter" style="width:auto;padding:6px 12px;">
+            <option value="pending">待处理</option>
+            <option value="all">全部</option>
+            <option value="resolved">已处理</option>
+            <option value="dismissed">已驳回</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <div class="data-table">
+          <div class="data-table-header"><h3>举报列表</h3></div>
+          <div id="report-table">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+          <div id="pagination" style="padding:16px;display:flex;justify-content:center;"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script>
+    let currentPage = 1;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
+      const user = getUser();
+      if (user.role !== 'admin' && user.role !== 'moderator') { Toast.error('无权访问'); window.location.href = '/'; return; }
+
+      document.getElementById('menu-btn').addEventListener('click', () => {
+        document.querySelector('.admin-sidebar').classList.toggle('open');
+      });
+
+      document.getElementById('status-filter').addEventListener('change', () => {
+        currentPage = 1;
+        loadReports();
+      });
+
+      await loadReports();
+    });
+
+    async function loadReports(page = 1) {
+      currentPage = page;
+      const status = document.getElementById('status-filter').value;
+      const res = await api.get(`/reports?status=${status}&page=${page}`);
+      const container = document.getElementById('report-table');
+
+      if (!res || res.data.items.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="icon-flag"></i><h3>暂无举报</h3></div>';
+        return;
+      }
+
+      const statusNames = { pending: '待处理', resolved: '已处理', dismissed: '已驳回' };
+
+      container.innerHTML = `
+        <table>
+          <thead><tr><th>类型</th><th>内容</th><th>举报人</th><th>原因</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+          <tbody>
+            ${res.data.items.map(r => `
+              <tr>
+                <td>${r.post_id ? '帖子' : '评论'}</td>
+                <td style="max-width:200px;">
+                  ${r.post_title ? `<a href="/post.html?id=${r.post_id}" target="_blank">${escapeHtml(r.post_title.substring(0, 30))}...</a>` : ''}
+                  ${r.comment_content ? `<div class="text-muted text-xs">${escapeHtml(r.comment_content.substring(0, 30))}...</div>` : ''}
+                </td>
+                <td>${r.reporter_username}</td>
+                <td style="max-width:150px;">${escapeHtml(r.reason)}</td>
+                <td><span class="status-badge ${r.status}">${statusNames[r.status] || r.status}</span></td>
+                <td class="text-muted">${timeAgo(r.created_at)}</td>
+                <td>
+                  ${r.status === 'pending' ? `
+                    <div class="actions">
+                      <button class="btn btn-ghost btn-sm" onclick="resolveReport(${r.id})" title="处理">
+                        <i class="icon-check" style="color:var(--success);"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-sm" onclick="dismissReport(${r.id})" title="驳回">
+                        <i class="icon-x" style="color:var(--danger);"></i>
+                      </button>
+                    </div>
+                  ` : '-'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      if (res.data.total_pages > 1) {
+        document.getElementById('pagination').innerHTML = pagination(currentPage, res.data.total_pages);
+        window.loadPage = p => loadReports(p);
+      }
+    }
+
+    async function resolveReport(id) {
+      const res = await api.put(`/reports/${id}`, { status: 'resolved' });
+      if (res && res.code === 200) { Toast.success('已处理'); loadReports(currentPage); }
+    }
+
+    async function dismissReport(id) {
+      const res = await api.put(`/reports/${id}`, { status: 'dismissed' });
+      if (res && res.code === 200) { Toast.success('已驳回'); loadReports(currentPage); }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人主页 - 论坛</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="navbar"><div class="navbar-inner"></div></header>
+
+  <main class="container">
+    <div class="page-header">
+      <a href="/" class="btn btn-ghost btn-sm mb-2"><i class="icon-arrow-left"></i> 返回</a>
+    </div>
+
+    <!-- 用户信息卡 -->
+    <div class="card mb-4" id="profile-card">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+
+    <!-- 标签页 -->
+    <div class="card">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="posts">帖子</button>
+        <button class="tab-btn" data-tab="comments">评论</button>
+        <button class="tab-btn" data-tab="favorites">收藏</button>
+      </div>
+
+      <div id="tab-content">
+        <div id="posts-tab" class="tab-panel">
+          <div id="post-list"><div class="loading"><div class="spinner"></div></div></div>
+          <div id="pagination"></div>
+        </div>
+        <div id="comments-tab" class="tab-panel" style="display:none;"></div>
+        <div id="favorites-tab" class="tab-panel" style="display:none;"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script>
+    let currentUserId = null;
+    let currentTab = 'posts';
+    let currentPage = 1;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      initNavbar();
+
+      currentUserId = getQueryParam('id');
+      if (!currentUserId) { Toast.error('用户不存在'); window.location.href = '/'; return; }
+
+      // 加载用户信息
+      const userRes = await api.get(`/users/${currentUserId}`);
+      if (!userRes || !userRes.data) {
+        Toast.error('用户不存在');
+        window.location.href = '/';
+        return;
+      }
+
+      const user = userRes.data;
+      const isOwn = getUser() && getUser().id === user.id;
+
+      document.getElementById('profile-card').innerHTML = `
+        <div class="card-body">
+          <div class="flex items-center gap-4 mb-4">
+            <img src="${getAvatarUrl(user)}" alt="${user.username}" class="avatar avatar-xl" onerror="this.outerHTML='${defaultAvatar(user.username, 96)}'">
+            <div>
+              <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:4px;">${user.username}
+                ${user.role !== 'user' ? `<span class="badge ${user.role === 'admin' ? 'badge-pin' : ''}" style="margin-left:8px;">${user.role === 'admin' ? '管理员' : '版主'}</span>` : ''}
+              </h2>
+              <div class="text-muted text-sm">Lv.${user.level} · ${user.points} 积分</div>
+            </div>
+            ${isOwn ? '<a href="/settings.html" class="btn btn-secondary btn-sm" style="margin-left:auto;"><i class="icon-settings"></i> 编辑资料</a>' : ''}
+          </div>
+          ${user.bio ? `<p class="text-sm" style="margin-bottom:16px;">${escapeHtml(user.bio)}</p>` : ''}
+          <div class="flex gap-4 text-sm text-muted">
+            <span><i class="icon-file-text"></i> ${user.stats?.posts || 0} 帖子</span>
+            <span><i class="icon-message-circle"></i> ${user.stats?.comments || 0} 评论</span>
+            <span><i class="icon-calendar"></i> 加入于 ${formatDate(user.created_at)}</span>
+            ${user.website ? `<span><i class="icon-link"></i> <a href="${user.website}" target="_blank">${user.website}</a></span>` : ''}
+          </div>
+        </div>
+      `;
+
+      setPageTitle(`${user.username} 的主页`);
+
+      // Tab 切换
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentTab = btn.dataset.tab;
+          document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+          document.getElementById(`${currentTab}-tab`).style.display = 'block';
+          loadTab();
+        });
+      });
+
+      loadTab();
+    });
+
+    async function loadTab() {
+      const container = document.getElementById('post-list');
+      if (currentTab === 'posts') {
+        const res = await api.get(`/users/${currentUserId}/posts?page=${currentPage}`);
+        if (res && res.code === 200) {
+          renderPostList(res.data.items, 'post-list');
+          if (res.data.total_pages > 1) {
+            document.getElementById('pagination').innerHTML = pagination(currentPage, res.data.total_pages);
+            window.loadPage = p => { currentPage = p; loadTab(); };
+          }
+        }
+      } else if (currentTab === 'comments') {
+        // 简化：显示用户最近的帖子作为内容
+        const res = await api.get(`/users/${currentUserId}/posts?page=${currentPage}&per_page=10`);
+        if (res && res.code === 200 && res.data.items.length > 0) {
+          document.getElementById('post-list').innerHTML = res.data.items.map(p => `
+            <div class="post-card" data-id="${p.id}">
+              <a href="/post.html?id=${p.id}" class="post-card-title">${escapeHtml(p.title)}</a>
+              <div class="post-card-meta">
+                <span>${timeAgo(p.created_at)}</span>
+                <span><i class="icon-eye"></i> ${p.view_count}</span>
+                <span><i class="icon-thumbs-up"></i> ${p.like_count}</span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          document.getElementById('post-list').innerHTML = emptyState('icon-message-circle', '暂无内容', '还没有发布任何帖子');
+        }
+      } else if (currentTab === 'favorites') {
+        if (!isLoggedIn() || getUser().id !== parseInt(currentUserId)) {
+          document.getElementById('post-list').innerHTML = emptyState('icon-lock', '无法访问', '只能查看自己的收藏');
+          return;
+        }
+        const res = await api.get(`/favorites?page=${currentPage}`);
+        if (res && res.code === 200) {
+          renderPostList(res.data.items, 'post-list');
+          if (res.data.total_pages > 1) {
+            document.getElementById('pagination').innerHTML = pagination(currentPage, res.data.total_pages);
+            window.loadPage = p => { currentPage = p; loadTab(); };
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>标签管理 - 管理后台</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <i class="icon-message-circle" style="font-size:1.5rem;color:var(--accent);"></i>
+        <h1>论坛管理</h1>
+      </div>
+      <nav class="admin-nav">
+        <a href="/admin/index.html" class="admin-nav-item"><i class="icon-bar-chart-2"></i> 仪表盘</a>
+        <a href="/admin/posts.html" class="admin-nav-item"><i class="icon-file-text"></i> 帖子管理</a>
+        <a href="/admin/users.html" class="admin-nav-item"><i class="icon-users"></i> 用户管理</a>
+        <a href="/admin/reports.html" class="admin-nav-item"><i class="icon-flag"></i> 举报管理</a>
+        <a href="/admin/categories.html" class="admin-nav-item"><i class="icon-folder"></i> 分类管理</a>
+        <a href="/admin/tags.html" class="admin-nav-item active"><i class="icon-tag"></i> 标签管理</a>
+        <a href="/admin/settings.html" class="admin-nav-item"><i class="icon-settings"></i> 系统设置</a>
+        <a href="/" class="admin-nav-item" target="_blank"><i class="icon-external-link"></i> 访问前台</a>
+      </nav>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <div class="admin-header-left">
+          <button class="admin-menu-btn" id="menu-btn"><i class="icon-menu"></i></button>
+          <div class="admin-breadcrumb"><a href="/admin/index.html">管理后台</a> <i class="icon-chevron-right"></i> 标签管理</div>
+        </div>
+        <div class="admin-header-right">
+          <button class="btn btn-primary btn-sm" id="add-btn"><i class="icon-plus"></i> 新增标签</button>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <div class="data-table">
+          <div class="data-table-header"><h3>标签列表</h3></div>
+          <div id="tag-table">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 新增弹窗 -->
+  <div class="modal-overlay" id="add-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>新增标签</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closeAddModal()"><i class="icon-x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">标签名称</label>
+          <input type="text" class="form-input" id="tag-name" placeholder="如: Python">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeAddModal()">取消</button>
+        <button class="btn btn-primary" id="add-tag-btn">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
+      const user = getUser();
+      if (user.role !== 'admin') { Toast.error('仅管理员可访问'); window.location.href = '/'; return; }
+
+      document.getElementById('menu-btn').addEventListener('click', () => {
+        document.querySelector('.admin-sidebar').classList.toggle('open');
+      });
+
+      document.getElementById('add-btn').addEventListener('click', () => {
+        document.getElementById('add-modal').classList.add('show');
+        document.getElementById('tag-name').value = '';
+        document.getElementById('tag-name').focus();
+      });
+
+      document.getElementById('add-tag-btn').addEventListener('click', async () => {
+        const name = document.getElementById('tag-name').value.trim();
+        if (!name) { Toast.error('名称不能为空'); return; }
+        const res = await api.post('/tags', { name });
+        if (res && res.code === 200) { Toast.success('已创建'); closeAddModal(); loadTags(); }
+        else { Toast.error(res?.message || '创建失败'); }
+      });
+
+      await loadTags();
+    });
+
+    async function loadTags() {
+      const res = await api.get('/tags');
+      const container = document.getElementById('tag-table');
+      if (!res || !res.data) return;
+
+      container.innerHTML = `
+        <table>
+          <thead><tr><th>名称</th><th>Slug</th><th>帖子数</th><th>操作</th></tr></thead>
+          <tbody>
+            ${res.data.map(t => `
+              <tr>
+                <td><span class="tag">${t.name}</span></td>
+                <td class="text-muted">${t.slug}</td>
+                <td>${t.post_count}</td>
+                <td>
+                  <button class="btn btn-ghost btn-sm" onclick="deleteTag(${t.id})"><i class="icon-trash-2"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function closeAddModal() {
+      document.getElementById('add-modal').classList.remove('show');
+    }
+
+    async function deleteTag(id) {
+      if (!confirm('确定删除该标签？')) return;
+      const res = await api.delete(`/tags/${id}`);
+      if (res && res.code === 200) { Toast.success('已删除'); loadTags(); }
+      else { Toast.error(res?.message || '删除失败'); }
+    }
+  </script>
+</body>
+</html>

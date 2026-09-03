@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理 - 管理后台</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <i class="icon-message-circle" style="font-size:1.5rem;color:var(--accent);"></i>
+        <h1>论坛管理</h1>
+      </div>
+      <nav class="admin-nav">
+        <a href="/admin/index.html" class="admin-nav-item"><i class="icon-bar-chart-2"></i> 仪表盘</a>
+        <a href="/admin/posts.html" class="admin-nav-item"><i class="icon-file-text"></i> 帖子管理</a>
+        <a href="/admin/users.html" class="admin-nav-item active"><i class="icon-users"></i> 用户管理</a>
+        <a href="/admin/reports.html" class="admin-nav-item"><i class="icon-flag"></i> 举报管理</a>
+        <a href="/admin/categories.html" class="admin-nav-item"><i class="icon-folder"></i> 分类管理</a>
+        <a href="/admin/tags.html" class="admin-nav-item"><i class="icon-tag"></i> 标签管理</a>
+        <a href="/admin/settings.html" class="admin-nav-item"><i class="icon-settings"></i> 系统设置</a>
+        <a href="/" class="admin-nav-item" target="_blank"><i class="icon-external-link"></i> 访问前台</a>
+      </nav>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <div class="admin-header-left">
+          <button class="admin-menu-btn" id="menu-btn"><i class="icon-menu"></i></button>
+          <div class="admin-breadcrumb"><a href="/admin/index.html">管理后台</a> <i class="icon-chevron-right"></i> 用户管理</div>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <div class="data-table">
+          <div class="data-table-header">
+            <h3>用户列表</h3>
+            <div class="data-table-search">
+              <input type="text" placeholder="搜索用户名/邮箱..." id="search-input">
+              <button class="btn btn-secondary btn-sm" id="search-btn"><i class="icon-search"></i></button>
+            </div>
+          </div>
+          <div id="user-table">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+          <div id="pagination" style="padding:16px;display:flex;justify-content:center;"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/icons.js"></script>
+  <script src="/static/js/animated-icons.js"></script>
+  <script>
+    let currentPage = 1;
+    let searchKeyword = '';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
+      const user = getUser();
+      if (user.role !== 'admin' && user.role !== 'moderator') { Toast.error('无权访问'); window.location.href = '/'; return; }
+
+      document.getElementById('search-btn').addEventListener('click', () => {
+        searchKeyword = document.getElementById('search-input').value.trim();
+        currentPage = 1;
+        loadUsers();
+      });
+
+      document.getElementById('search-input').addEventListener('keypress', e => {
+        if (e.key === 'Enter') {
+          searchKeyword = e.target.value.trim();
+          currentPage = 1;
+          loadUsers();
+        }
+      });
+
+      await loadUsers();
+
+      document.getElementById('menu-btn').addEventListener('click', () => {
+        document.querySelector('.admin-sidebar').classList.toggle('open');
+      });
+    });
+
+    async function loadUsers(page = 1) {
+      currentPage = page;
+      const params = new URLSearchParams({ page, per_page: 20 });
+      if (searchKeyword) params.set('search', searchKeyword);
+
+      const res = await api.get(`/users/admin/list?${params}`);
+      const container = document.getElementById('user-table');
+
+      if (!res || res.data.items.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="icon-users"></i><h3>暂无用户</h3></div>';
+        return;
+      }
+
+      container.innerHTML = `
+        <table>
+          <thead><tr><th>用户</th><th>邮箱</th><th>角色</th><th>积分</th><th>状态</th><th>注册时间</th><th>操作</th></tr></thead>
+          <tbody>
+            ${res.data.items.map(u => `
+              <tr>
+                <td>
+                  <div class="user-info-row">
+                    <img src="${getAvatarUrl(u)}" alt="${u.username}" class="avatar avatar-xs" onerror="this.outerHTML='${defaultAvatar(u.username, 24)}'">
+                    <a href="/profile.html?id=${u.id}" target="_blank">${u.username}</a>
+                  </div>
+                </td>
+                <td class="text-muted">${u.email}</td>
+                <td><span class="role-badge ${u.role}">${u.role === 'admin' ? '管理员' : u.role === 'moderator' ? '版主' : '用户'}</span></td>
+                <td>${u.points}</td>
+                <td>${u.is_banned ? '<span class="status-badge pending">已禁用</span>' : '<span class="status-badge published">正常</span>'}</td>
+                <td class="text-muted">${timeAgo(u.created_at)}</td>
+                <td>
+                  <div class="actions">
+                    ${u.id !== getUser().id ? `
+                      <button class="btn btn-ghost btn-sm" onclick="toggleBan(${u.id}, ${!u.is_banned})">
+                        <i class="icon-${u.is_banned ? 'check' : 'x'}"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-sm" onclick="setRole(${u.id}, '${u.role}')">
+                        <i class="icon-shield"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-sm" onclick="deleteUser(${u.id})">
+                        <i class="icon-trash-2"></i>
+                      </button>
+                    ` : '<span class="text-muted text-xs">-</span>'}
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      if (res.data.total_pages > 1) {
+        document.getElementById('pagination').innerHTML = pagination(currentPage, res.data.total_pages);
+        window.loadPage = p => loadUsers(p);
+      }
+    }
+
+    async function toggleBan(userId, banned) {
+      if (!confirm(`确定${banned ? '禁用' : '启用'}该用户？`)) return;
+      const res = await api.put(`/users/admin/${userId}/ban`, { is_banned: banned });
+      if (res && res.code === 200) { Toast.success(banned ? '已禁用' : '已启用'); loadUsers(currentPage); }
+    }
+
+    async function setRole(userId, currentRole) {
+      const roles = ['user', 'moderator', 'admin'];
+      const names = { user: '用户', moderator: '版主', admin: '管理员' };
+      const next = roles[(roles.indexOf(currentRole) + 1) % roles.length];
+      if (!confirm(`确定将角色设为「${names[next]}」？`)) return;
+      const res = await api.put(`/users/admin/${userId}/role`, { role: next });
+      if (res && res.code === 200) { Toast.success('角色已更新'); loadUsers(currentPage); }
+    }
+
+    async function deleteUser(userId) {
+      if (!confirm('确定删除该用户？此操作不可恢复！')) return;
+      const res = await api.delete(`/users/admin/${userId}`);
+      if (res && res.code === 200) { Toast.success('已删除'); loadUsers(currentPage); }
+    }
+  </script>
+</body>
+</html>
