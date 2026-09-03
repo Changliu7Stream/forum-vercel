@@ -17,17 +17,14 @@ let pool = null;
  */
 function getPool() {
   if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL 环境变量未设置');
-    }
+    // 优先用环境变量（推荐，更安全）；无环境变量时用 fallback 连接
+    const connectionString = process.env.DATABASE_URL ||
+      'postgresql://forum_app.ofydzectpjylurtbcmis:Forum2026Secure%21@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true';
     pool = new Pool({
       connectionString,
-      // Vercel Serverless 优化：限制连接数，配合 Supabase pooler 使用
       max: process.env.PG_MAX_CONN ? parseInt(process.env.PG_MAX_CONN) : 3,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
-      // Supabase pooler 需要
       ssl: process.env.PG_SSL === 'false' ? false : { rejectUnauthorized: false }
     });
 
