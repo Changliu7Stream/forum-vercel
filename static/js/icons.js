@@ -141,7 +141,6 @@
       svg.setAttribute('stroke-width', '2');
       svg.setAttribute('stroke-linecap', 'round');
       svg.setAttribute('stroke-linejoin', 'round');
-      svg.style.display = 'inline-block';
       svg.style.verticalAlign = 'middle';
       svg.innerHTML = pathData;
       return svg;
