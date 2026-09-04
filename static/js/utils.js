@@ -235,6 +235,36 @@ function toggleTheme() {
   }
 }
 
+// 站点设置缓存
+let siteSettingsCache = null;
+
+// 应用主题样式设置（胶囊开关 / 过渡动画）
+function applyThemeStyle(settings) {
+  if (!document.body) return;
+  const style = (settings && settings.theme_style) || 'default';
+  const transition = (settings && settings.theme_transition) || 'true';
+  document.body.classList.toggle('theme-pill', style === 'pill');
+  document.body.classList.toggle('theme-anim', transition !== 'false');
+}
+
+// 加载站点设置（先读本地缓存避免闪烁，再异步刷新）
+async function loadSettings() {
+  try {
+    const cached = localStorage.getItem('forum_settings');
+    if (cached) applyThemeStyle(JSON.parse(cached));
+  } catch (e) {}
+
+  try {
+    const res = await apiGet('/settings');
+    if (res && res.data) {
+      siteSettingsCache = res.data;
+      try { localStorage.setItem('forum_settings', JSON.stringify(res.data)); } catch (e) {}
+      applyThemeStyle(res.data);
+    }
+  } catch (e) {}
+  return siteSettingsCache;
+}
+
 // 简单的 Markdown 渲染（用于前端预览）
 function renderMarkdown(text) {
   if (!text) return '';
@@ -381,6 +411,7 @@ function pagination(current, total, onPage) {
 // 初始化通用功能
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
+  loadSettings();
 
   // 主题切换按钮
   document.addEventListener('click', e => {
@@ -419,6 +450,8 @@ window.isLoggedIn = isLoggedIn;
 window.getUser = getUser;
 window.initTheme = initTheme;
 window.toggleTheme = toggleTheme;
+window.loadSettings = loadSettings;
+window.applyThemeStyle = applyThemeStyle;
 window.renderMarkdown = renderMarkdown;
 window.escapeHtml = escapeHtml;
 window.defaultAvatar = defaultAvatar;

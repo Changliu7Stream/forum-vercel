@@ -128,6 +128,38 @@
           </div>
         </div>
 
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <h3><i class="icon-sun"></i> 外观设置</h3>
+          </div>
+          <div class="settings-section-body">
+            <div class="settings-row">
+              <div class="settings-row-label">
+                <h4>主题切换开关样式</h4>
+                <p>选择导航栏主题切换按钮的样式</p>
+              </div>
+              <div class="settings-row-control">
+                <select class="form-input" id="setting-theme_style" style="width:200px;">
+                  <option value="default">默认风格（月亮/太阳）</option>
+                  <option value="pill">胶囊开关</option>
+                </select>
+              </div>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-label">
+                <h4>过渡动画</h4>
+                <p>开启后切换主题时颜色平滑过渡</p>
+              </div>
+              <div class="settings-row-control">
+                <label class="toggle">
+                  <input type="checkbox" id="setting-theme_transition">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div style="margin-top:20px;">
           <button class="btn btn-primary btn-lg" id="save-btn">
             <i class="icon-check"></i> 保存设置
@@ -161,6 +193,8 @@
         document.getElementById('setting-post_moderation').checked = settings.post_moderation === 'true';
         document.getElementById('setting-posts_per_page').value = settings.posts_per_page || 20;
         document.getElementById('setting-comments_per_page').value = settings.comments_per_page || 50;
+        document.getElementById('setting-theme_style').value = settings.theme_style || 'default';
+        document.getElementById('setting-theme_transition').checked = settings.theme_transition !== 'false';
       }
 
       // 保存设置
@@ -176,7 +210,9 @@
           allow_register: document.getElementById('setting-allow_register').checked ? 'true' : 'false',
           post_moderation: document.getElementById('setting-post_moderation').checked ? 'true' : 'false',
           posts_per_page: document.getElementById('setting-posts_per_page').value,
-          comments_per_page: document.getElementById('setting-comments_per_page').value
+          comments_per_page: document.getElementById('setting-comments_per_page').value,
+          theme_style: document.getElementById('setting-theme_style').value,
+          theme_transition: document.getElementById('setting-theme_transition').checked ? 'true' : 'false'
         };
 
         const res = await api.put('/settings', data);

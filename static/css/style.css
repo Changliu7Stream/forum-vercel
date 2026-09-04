@@ -368,6 +368,55 @@ a:hover { color: var(--accent-hover); }
 [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
 
+/* 主题切换滑块（胶囊模式用，默认隐藏） */
+.theme-pill-thumb { display: none; }
+
+/* ===== 胶囊风格主题开关 ===== */
+body.theme-pill .theme-toggle {
+  width: 64px;
+  height: 32px;
+  border-radius: 16px;
+  background: var(--bg-tertiary);
+  position: relative;
+}
+body.theme-pill .theme-toggle:hover { background: var(--bg-hover); }
+
+body.theme-pill .theme-toggle svg {
+  width: 16px;
+  height: 16px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  z-index: 1;
+  pointer-events: none;
+}
+body.theme-pill .theme-toggle .icon-moon { left: 9px; display: block; }
+body.theme-pill .theme-toggle .icon-sun { right: 9px; display: block; }
+
+body.theme-pill .theme-pill-thumb {
+  display: block;
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  top: 3px;
+  left: 3px;
+  z-index: 0;
+  pointer-events: none;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-theme="dark"] body.theme-pill .theme-pill-thumb { transform: translateX(32px); }
+
+/* ===== 主题过渡动画（可选） ===== */
+body.theme-anim *,
+body.theme-anim *::before,
+body.theme-anim *::after {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, fill 0.25s ease, stroke 0.25s ease;
+}
+
 /* 动画图标 Web Component 通用样式（继承颜色、垂直对齐） */
 .navbar [class^="animated-lucide-"],
 .navbar [class*=" animated-lucide-"],

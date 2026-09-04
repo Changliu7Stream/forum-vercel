@@ -34,6 +34,7 @@ function renderNavbar() {
       <button class="theme-toggle" title="切换主题" aria-label="切换主题">
         <animated-lucide-moon class="icon-moon"></animated-lucide-moon>
         <animated-lucide-sun class="icon-sun"></animated-lucide-sun>
+        <span class="theme-pill-thumb"></span>
       </button>
       <button class="mobile-nav-toggle" id="mobile-menu-toggle" aria-label="菜单">
         <animated-lucide-menu></animated-lucide-menu>
