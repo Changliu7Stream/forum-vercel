@@ -146,6 +146,7 @@
       if (!confirm(`确定${banned ? '禁用' : '启用'}该用户？`)) return;
       const res = await api.put(`/users/admin/${userId}/ban`, { is_banned: banned });
       if (res && res.code === 200) { Toast.success(banned ? '已禁用' : '已启用'); loadUsers(currentPage); }
+      else { Toast.error(res && res.message ? res.message : '操作失败'); }
     }
 
     async function setRole(userId, currentRole) {
@@ -155,12 +156,14 @@
       if (!confirm(`确定将角色设为「${names[next]}」？`)) return;
       const res = await api.put(`/users/admin/${userId}/role`, { role: next });
       if (res && res.code === 200) { Toast.success('角色已更新'); loadUsers(currentPage); }
+      else { Toast.error(res && res.message ? res.message : '操作失败'); }
     }
 
     async function deleteUser(userId) {
       if (!confirm('确定删除该用户？此操作不可恢复！')) return;
       const res = await api.delete(`/users/admin/${userId}`);
       if (res && res.code === 200) { Toast.success('已删除'); loadUsers(currentPage); }
+      else { Toast.error(res && res.message ? res.message : '删除失败'); }
     }
   </script>
 </body>

@@ -320,13 +320,13 @@ function initPostActions() {
       if (isActive) {
         btn.classList.remove('active');
         countEl.textContent = Math.max(0, currentCount - 1);
-        await api.delete(`/posts/${id}/like`);
+        const res = await api.delete(`/posts/${id}/like`);
+        if (!res || res.code !== 200) { btn.classList.add('active'); countEl.textContent = currentCount; }
       } else {
         btn.classList.add('active');
         countEl.textContent = currentCount + 1;
         const res = await api.post(`/posts/${id}/like`);
-        if (!res || res.code !== 200) btn.classList.remove('active');
-        countEl.textContent = currentCount;
+        if (res && res.code !== 200) { btn.classList.remove('active'); countEl.textContent = currentCount; Toast.error(res.message || '点赞失败'); }
       }
     });
   });
@@ -344,13 +344,13 @@ function initPostActions() {
       if (isActive) {
         btn.classList.remove('active');
         countEl.textContent = Math.max(0, currentCount - 1);
-        await api.delete(`/posts/${id}/favorite`);
+        const res = await api.delete(`/posts/${id}/favorite`);
+        if (!res || res.code !== 200) { btn.classList.add('active'); countEl.textContent = currentCount; }
       } else {
         btn.classList.add('active');
         countEl.textContent = currentCount + 1;
         const res = await api.post(`/posts/${id}/favorite`);
-        if (!res || res.code !== 200) btn.classList.remove('active');
-        countEl.textContent = currentCount;
+        if (res && res.code !== 200) { btn.classList.remove('active'); countEl.textContent = currentCount; Toast.error(res.message || '收藏失败'); }
       }
     });
   });
@@ -464,11 +464,13 @@ function initCommentActions(postId) {
       if (isActive) {
         btn.classList.remove('active');
         span.textContent = Math.max(0, count - 1);
-        await api.delete(`/comments/${id}/like`);
+        const res = await api.delete(`/comments/${id}/like`);
+        if (!res || res.code !== 200) { btn.classList.add('active'); span.textContent = count; }
       } else {
         btn.classList.add('active');
         span.textContent = count + 1;
-        await api.post(`/comments/${id}/like`);
+        const res = await api.post(`/comments/${id}/like`);
+        if (res && res.code !== 200) { btn.classList.remove('active'); span.textContent = count; Toast.error(res.message || '点赞失败'); }
       }
     });
   });
@@ -495,6 +497,8 @@ function initCommentActions(postId) {
       if (res && res.code === 200) {
         Toast.success('已删除');
         btn.closest('.comment').remove();
+      } else {
+        Toast.error(res && res.message ? res.message : '删除失败');
       }
     });
   });
@@ -527,6 +531,8 @@ async function submitComment(postId) {
     // 刷新评论
     const res2 = await api.get(`/posts/${postId}/comments`);
     if (res2) renderCommentList(res2.data, postId);
+  } else {
+    Toast.error(res && res.message ? res.message : '评论失败');
   }
 }
 

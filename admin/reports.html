@@ -132,11 +132,13 @@
     async function resolveReport(id) {
       const res = await api.put(`/reports/${id}`, { status: 'resolved' });
       if (res && res.code === 200) { Toast.success('已处理'); loadReports(currentPage); }
+      else { Toast.error(res && res.message ? res.message : '操作失败'); }
     }
 
     async function dismissReport(id) {
       const res = await api.put(`/reports/${id}`, { status: 'dismissed' });
       if (res && res.code === 200) { Toast.success('已驳回'); loadReports(currentPage); }
+      else { Toast.error(res && res.message ? res.message : '操作失败'); }
     }
   </script>
 </body>

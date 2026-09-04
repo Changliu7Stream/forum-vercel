@@ -173,6 +173,11 @@
   <script src="/static/js/icons.js"></script>
   <script src="/static/js/animated-icons.js"></script>
   <script>
+    function setBtn(btn, html) {
+      btn.innerHTML = html;
+      if (window.replaceIcons) window.replaceIcons();
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
       const user = getUser();
@@ -183,25 +188,31 @@
       });
 
       // 加载设置
-      const res = await api.get('/settings');
-      if (res && res.data) {
-        const settings = res.data;
-        document.getElementById('setting-site_name').value = settings.site_name || '';
-        document.getElementById('setting-site_description').value = settings.site_description || '';
-        document.getElementById('setting-site_keywords').value = settings.site_keywords || '';
-        document.getElementById('setting-allow_register').checked = settings.allow_register === 'true';
-        document.getElementById('setting-post_moderation').checked = settings.post_moderation === 'true';
-        document.getElementById('setting-posts_per_page').value = settings.posts_per_page || 20;
-        document.getElementById('setting-comments_per_page').value = settings.comments_per_page || 50;
-        document.getElementById('setting-theme_style').value = settings.theme_style || 'default';
-        document.getElementById('setting-theme_transition').checked = settings.theme_transition !== 'false';
+      try {
+        const res = await api.get('/settings');
+        if (res && res.code === 200 && res.data) {
+          const settings = res.data;
+          document.getElementById('setting-site_name').value = settings.site_name || '';
+          document.getElementById('setting-site_description').value = settings.site_description || '';
+          document.getElementById('setting-site_keywords').value = settings.site_keywords || '';
+          document.getElementById('setting-allow_register').checked = settings.allow_register === 'true';
+          document.getElementById('setting-post_moderation').checked = settings.post_moderation === 'true';
+          document.getElementById('setting-posts_per_page').value = settings.posts_per_page || 20;
+          document.getElementById('setting-comments_per_page').value = settings.comments_per_page || 50;
+          document.getElementById('setting-theme_style').value = settings.theme_style || 'default';
+          document.getElementById('setting-theme_transition').checked = settings.theme_transition !== 'false';
+        } else {
+          Toast.error('加载设置失败');
+        }
+      } catch (err) {
+        Toast.error('加载设置失败');
       }
 
       // 保存设置
       document.getElementById('save-btn').addEventListener('click', async () => {
         const btn = document.getElementById('save-btn');
         btn.disabled = true;
-        btn.innerHTML = '<i class="icon-loader"></i> 保存中...';
+        setBtn(btn, '<i class="icon-loader"></i> 保存中...');
 
         const data = {
           site_name: document.getElementById('setting-site_name').value,
@@ -215,14 +226,24 @@
           theme_transition: document.getElementById('setting-theme_transition').checked ? 'true' : 'false'
         };
 
-        const res = await api.put('/settings', data);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="icon-check"></i> 保存设置';
+        try {
+          const res = await api.put('/settings', data);
 
-        if (res && res.code === 200) {
-          Toast.success('设置已保存');
-        } else {
-          Toast.error('保存失败');
+          if (res && res.code === 200) {
+            Toast.success('设置已保存');
+            // 更新本地缓存并即时应用主题外观
+            try {
+              localStorage.setItem('forum_settings', JSON.stringify(data));
+            } catch (e) {}
+            if (window.applyThemeStyle) window.applyThemeStyle(data);
+          } else {
+            Toast.error(res && res.message ? res.message : '保存失败');
+          }
+        } catch (err) {
+          Toast.error('保存失败，请稍后重试');
+        } finally {
+          btn.disabled = false;
+          setBtn(btn, '<i class="icon-check"></i> 保存设置');
         }
       });
     });

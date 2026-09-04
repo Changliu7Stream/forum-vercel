@@ -185,7 +185,7 @@
 
       btn.disabled = false;
       if (res && res.code === 200) { Toast.success(id ? '已更新' : '已创建'); closeModal(); loadCategories(); }
-      else { Toast.error('保存失败'); }
+      else { Toast.error(res && res.message ? res.message : '保存失败'); }
     }
 
     async function deleteCategory(id) {

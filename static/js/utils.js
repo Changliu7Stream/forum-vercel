@@ -144,6 +144,7 @@ const Toast = {
     `;
 
     this.container.appendChild(toast);
+    if (window.replaceIcons) window.replaceIcons();
 
     setTimeout(() => {
       toast.style.animation = 'slideIn 0.3s ease reverse';

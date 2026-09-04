@@ -134,17 +134,20 @@
     async function togglePin(postId, pinned) {
       const res = await api.post(`/posts/admin/${postId}/pin`, { is_pinned: pinned });
       if (res && res.code === 200) { Toast.success(pinned ? '已置顶' : '已取消置顶'); loadPosts(currentPage); }
+      else { Toast.error(res && res.message ? res.message : '操作失败'); }
     }
 
     async function toggleFeature(postId, featured) {
       const res = await api.post(`/posts/admin/${postId}/feature`, { is_featured: featured });
       if (res && res.code === 200) { Toast.success(featured ? '已设为精华' : '已取消精华'); loadPosts(currentPage); }
+      else { Toast.error(res && res.message ? res.message : '操作失败'); }
     }
 
     async function deletePost(postId) {
       if (!confirm('确定删除该帖子？')) return;
       const res = await api.delete(`/posts/${postId}`);
       if (res && res.code === 200) { Toast.success('已删除'); loadPosts(currentPage); }
+      else { Toast.error(res && res.message ? res.message : '删除失败'); }
     }
   </script>
 </body>
